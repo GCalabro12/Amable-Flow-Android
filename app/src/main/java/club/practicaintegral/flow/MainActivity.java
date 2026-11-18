@@ -20,6 +20,18 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import android.os.CancellationSignal;
+
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
+
 import org.json.JSONObject;
 
 import java.util.Locale;
@@ -104,6 +116,44 @@ public class MainActivity extends Activity {
         web.loadUrl(WEB + "?app=android");
     }
 
+    /** ID de cliente web del proyecto Firebase equilibra-6aff8 (el mismo que Amable Life). */
+    static final String CLIENTE_WEB = "682128349771-a175emei7guudhv3gt08ra5vb3bcuuus.apps.googleusercontent.com";
+
+    /** Entrar con Google dentro de la app: Google no deja iniciar sesión en un WebView, así que lo hace el teléfono
+     *  y devuelve un token a la web (window.nativeGoogle(token, error)). */
+    void entrarConGoogle() {
+        try {
+            CredentialManager cm = CredentialManager.create(this);
+            GetCredentialRequest req = new GetCredentialRequest.Builder()
+                    .addCredentialOption(new GetSignInWithGoogleOption.Builder(CLIENTE_WEB).build())
+                    .build();
+            cm.getCredentialAsync(this, req, new CancellationSignal(), getMainExecutor(),
+                    new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                        @Override public void onResult(GetCredentialResponse r) {
+                            try {
+                                if (r.getCredential() instanceof CustomCredential
+                                        && GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(r.getCredential().getType())) {
+                                    enviarGoogle(GoogleIdTokenCredential.createFrom(r.getCredential().getData()).getIdToken(), null);
+                                } else enviarGoogle(null, "Google no ha devuelto una cuenta válida.");
+                            } catch (RuntimeException e) { enviarGoogle(null, "No se pudo leer la cuenta de Google: " + e.getMessage()); }
+                        }
+                        @Override public void onError(GetCredentialException e) {
+                            if (e instanceof GetCredentialCancellationException) enviarGoogle(null, "");
+                            else enviarGoogle(null, "No se pudo entrar con Google (" + e.getType() + "). Usa email y PIN.");
+                        }
+                    });
+        } catch (RuntimeException e) {
+            enviarGoogle(null, "No se pudo abrir el inicio de sesión de Google: " + e.getMessage());
+        }
+    }
+
+    void enviarGoogle(String token, String error) {
+        if (web == null) return;
+        web.evaluateJavascript("window.nativeGoogle && window.nativeGoogle("
+                + (token == null ? "null" : JSONObject.quote(token)) + ","
+                + (error == null ? "null" : JSONObject.quote(error)) + ")", null);
+    }
+
     void abrirFuera(Uri u) {
         try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
     }
@@ -153,5 +203,9 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface
         public void callar() { runOnUiThread(() -> { if (tts != null) tts.stop(); }); }
+        @JavascriptInterface
+        public void googleLogin() { runOnUiThread(MainActivity.this::entrarConGoogle); }
+        @JavascriptInterface
+        public String version() { return BuildConfig.VERSION_NAME; }
     }
 }
