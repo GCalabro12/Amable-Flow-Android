@@ -34,7 +34,7 @@ public class AlarmaReceiver extends BroadcastReceiver {
         canal.enableVibration(true);
         nm.createNotificationChannel(canal);
 
-        Intent abrir = new Intent(c, AlarmaActivity.class).putExtra("titulo", titulo)
+        Intent abrir = new Intent(c, AlarmaActivity.class).putExtra("titulo", titulo).putExtra("id", id)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pantalla = PendingIntent.getActivity(c, 7, abrir, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification n = new Notification.Builder(c, CANAL)
@@ -49,6 +49,8 @@ public class AlarmaReceiver extends BroadcastReceiver {
         nm.notify(AVISO, n);
         try { c.startActivity(abrir); } catch (Exception ignored) {}
 
-        try { Alarmas.programar(c, id, Alarmas.todas(c).optJSONObject(id)); } catch (Exception ignored) {}
+        // una alarma pospuesta suena una sola vez; la de siempre deja programada la siguiente
+        if (!i.getBooleanExtra("pospuesta", false))
+            try { Alarmas.programar(c, id, Alarmas.todas(c).optJSONObject(id)); } catch (Exception ignored) {}
     }
 }
