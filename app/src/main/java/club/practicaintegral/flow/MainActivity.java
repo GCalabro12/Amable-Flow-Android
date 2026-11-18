@@ -19,6 +19,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.view.WindowInsets;
+import android.widget.FrameLayout;
 
 import android.os.CancellationSignal;
 
@@ -59,7 +61,25 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         web = new WebView(this);
-        setContentView(web);
+        // Android 15+ dibuja la app debajo de la barra de arriba (hora, batería) y de la de abajo:
+        // la web va dentro de un marco que deja ese hueco libre (y también el del teclado)
+        FrameLayout marco = new FrameLayout(this);
+        marco.setBackgroundColor(0xFFEFEAE2);
+        marco.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        marco.setOnApplyWindowInsetsListener((v, ins) -> {
+            int l, t, r, bo;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets i = ins.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                android.graphics.Insets k = ins.getInsets(WindowInsets.Type.ime());
+                l = i.left; t = i.top; r = i.right; bo = Math.max(i.bottom, k.bottom);
+            } else {
+                l = ins.getSystemWindowInsetLeft(); t = ins.getSystemWindowInsetTop();
+                r = ins.getSystemWindowInsetRight(); bo = ins.getSystemWindowInsetBottom();
+            }
+            v.setPadding(l, t, r, bo);
+            return ins;
+        });
+        setContentView(marco);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -209,5 +229,8 @@ public class MainActivity extends Activity {
         public void googleLogin() { runOnUiThread(MainActivity.this::entrarConGoogle); }
         @JavascriptInterface
         public String version() { return BuildConfig.VERSION_NAME; }
+        /** Desde la 1.2 la app deja libre la barra de arriba: la web ya no tiene que dejar hueco */
+        @JavascriptInterface
+        public boolean margenes() { return true; }
     }
 }
