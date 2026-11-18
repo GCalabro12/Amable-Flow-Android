@@ -81,6 +81,8 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView v, String url) { v.evaluateJavascript(VOZ, null); }
         });
+        // Los archivos (por ejemplo, una APK nueva) se descargan con el navegador del teléfono
+        web.setDownloadListener((url, ua, cd, mime, len) -> abrirFuera(Uri.parse(url)));
         web.setWebChromeClient(new WebChromeClient() {
             // window.open (por ejemplo, el calendario de Google): se abre fuera, en el navegador
             @Override
